@@ -216,28 +216,6 @@ async def get_my_reports(request: Request):
     return {"status": "success", "data": [r.model_dump() for r in reports]}
 
 
-@router.post("/report/{report_id}/upvote", status_code=status.HTTP_200_OK)
-async def upvote_report(request: Request, report_id: str):
-    """
-    Increment upvote; prevent duplicates. Only acknowledgement returned.
-    """
-    user_id = _get_authenticated_user_id(request)
-    oid = _to_object_id(report_id)
-    if not oid:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid report id")
-
-    doc = reports_collection.find_one({"_id": oid})
-    if not doc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
-
-    # prevent duplicate upvote
-    if user_id in doc.get("upvoted_by", []):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already upvoted")
-
-    reports_collection.update_one(
-        {"_id": oid}, {"$addToSet": {"upvoted_by": user_id}, "$inc": {"upvotes": 1}, "$set": {"updated_at": datetime.utcnow()}}
-    )
-    return {"status": "success"}
 
 
 
