@@ -10,7 +10,7 @@ from fastapi import (
     Body,
     Depends,
 )
-import os
+import os,json,re
 import uuid
 import shutil
 from datetime import datetime
@@ -19,7 +19,7 @@ from pydantic import Field
 from bson.objectid import ObjectId
 from fastapi_clerk_auth import ClerkConfig, ClerkHTTPBearer, HTTPAuthorizationCredentials
 from ..database import crud
-
+import httpx
 
 ## Constants
 ALLOWED_CATEGORIES = {"Sanitation", "Pothole", "Streetlight", "Water Leakage", "Other"}
@@ -28,11 +28,17 @@ ALLOWED_DEPARTMENTS = {"Sanitation", "Public Works", "Electrical", "Water Board"
 ALLOWED_STATUSES = {"Submitted", "In Progress", "Resolved"}
 STATIC_UPLOAD_DIR = os.getenv("STATIC_UPLOAD_DIR", "static/uploads")
 os.makedirs(STATIC_UPLOAD_DIR, exist_ok=True)
+HF_API_TOKEN = os.getenv("HF_API_TOKEN")
+LLM_MODEL = os.getenv("LLM_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+IMAGE_CAPTION_MODEL = os.getenv("IMAGE_CAPTION_MODEL", "Salesforce/blip-image-captioning-large")
+HF_BASE = "https://api-inference.huggingface.co/models"
+HTTP_TIMEOUT = 60
+
 
 users_collection = crud.users_collection
 reports_collection = crud.reports_collection
 
-## helpers
+###  helpers
 def _get_authenticated_user_id(request: Request) -> str:
     user_id = getattr(request.state, "user_id", None)
     if not user_id:
@@ -73,7 +79,88 @@ def _to_object_id(oid_str: str) -> Optional[ObjectId]:
         return ObjectId(oid_str)
     except Exception:
         return None
-    
+
+async def _hf_text(model: str, prompt: str, max_tokens: int = 512) -> str:
+    if not HF_API_TOKEN:
+        raise RuntimeError("HF_API_TOKEN not set")
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as c:
+        r = await c.post(f"{HF_BASE}/{model}", headers={"Authorization": f"Bearer {HF_API_TOKEN}"}, json={
+            "inputs": prompt, "parameters": {"max_new_tokens": max_tokens, "temperature": 0.0}, "options": {"use_cache": False}
+        })
+    r.raise_for_status()
+    res = r.json()
+    if isinstance(res, list) and res:
+        return res[0].get("generated_text") or res[0].get("text") or str(res)
+    if isinstance(res, dict):
+        return res.get("generated_text") or res.get("text") or str(res)
+    return str(res)
+
+async def _hf_image_caption(model: str, image_bytes: bytes) -> Optional[str]:
+    if not HF_API_TOKEN:
+        raise RuntimeError("HF_API_TOKEN not set")
+    files = {"inputs": ("image.jpg", image_bytes, "image/jpeg")}
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as c:
+        r = await c.post(f"{HF_BASE}/{model}", headers={"Authorization": f"Bearer {HF_API_TOKEN}"}, files=files)
+    r.raise_for_status()
+    res = r.json()
+    if isinstance(res, list) and res:
+        return res[0].get("generated_text") or res[0].get("caption") or str(res)
+    if isinstance(res, dict):
+        return res.get("generated_text") or res.get("caption") or str(res)
+    return None
+
+def _parse_json(text: str) -> Optional[Dict[str, Any]]:
+    try:
+        return json.loads(text)
+    except Exception:
+        m = re.search(r'(\{.*\})', text, flags=re.DOTALL)
+        if not m: return None
+        cand = m.group(1)
+        # try to find balanced JSON
+        depth = 0
+        for i,ch in enumerate(cand):
+            if ch == '{': depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    try: return json.loads(cand[:i+1])
+                    except Exception: break
+        try:
+            return json.loads(cand.replace("'", '"'))
+        except Exception:
+            return None
+async def _reconcile_to_json(user_text: str, image_caption: Optional[str]) -> Dict[str, str]:
+    combined = f"User text:\n{user_text or '<none>'}\n\n"
+    if image_caption: combined += f"Image caption:\n{image_caption}\n\n"
+    combined += (
+        "Produce JSON only with keys: title (<=100 chars), category, urgency (Low|Medium|High), "
+        "assigned_department, description (<=500 chars). Prefer image for visual facts, text for claims. "
+    )
+    resp = await _hf_text(LLM_MODEL, combined, max_tokens=512)
+    parsed = _parse_json(resp) or {}
+    # minimal normalization & defaults
+    return {
+        "title": (parsed.get("title") or parsed.get("summary") or (user_text or image_caption or "Citizen report"))[:100],
+        "category": parsed.get("category") or "Other",
+        "urgency": parsed.get("urgency") or "Low",
+        "assigned_department": parsed.get("assigned_department") or parsed.get("department") or "General",
+        "description": (parsed.get("description") or parsed.get("text") or user_text or image_caption or "")[:500],
+    }
+def _conservative_stub(text: str) -> Dict[str, str]:
+    t = (text or "").lower()
+    cat, dep, urg = "Other", "General", "Low"
+    if any(k in t for k in ("pothole","hole","sink")):
+        cat, dep, urg = "Pothole", "Public Works", "Medium"
+    elif any(k in t for k in ("streetlight","lamp","light")):
+        cat, dep, urg = "Streetlight", "Electrical", "Medium"
+    elif any(k in t for k in ("water","leak","sewer","flood")):
+        cat, dep, urg = "Water Leakage", "Water Board", "High"
+    elif any(k in t for k in ("garbage","trash","bin","sanitation")):
+        cat, dep, urg = "Sanitation", "Sanitation", "Low"
+    title = (text or "")[:100] or "Citizen report"
+    return {"title": title, "category": cat, "urgency": urg, "assigned_department": dep, "description": (text or "")[:500]}
+
+### end of helpers 
     
 CLERK_JWKS_URL = os.environ.get("CLERK_JWKS_URL")
 if not CLERK_JWKS_URL:
@@ -104,79 +191,63 @@ async def smart_create_report(
     image: Optional[UploadFile] = File(None),
     image_url: Optional[str] = Form(None),
 ):
-    """
-    Stores a new report in database. Does NOT return the created document (only acknowledgement).
-    AI classification uses a local conservative stub — replace with your AI integration as needed.
-    """
     user_id = _get_authenticated_user_id(request)
-
     _validate_geo_coords(longitude, latitude)
 
     saved_image_url = None
+    image_caption = None
+    user_text = (text or "").strip()
+
     if image:
         try:
             saved_image_url = _save_upload(image)
+            image_bytes = await image.read()
+            try:
+                image_caption = await _hf_image_caption(IMAGE_CAPTION_MODEL, image_bytes)
+            except Exception:
+                image_caption = None
         except Exception:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to save uploaded file")
 
     if image_url:
         saved_image_url = image_url
 
-    # AI classifier stub - VERY simple conservative mapping
-    def ai_stub(text_in: Optional[str]) -> Dict[str, str]:
-        t = (text_in or "").lower()
-        category = "Other"
-        urgency = "Low"
-        assigned_department = "General"
-        if any(k in t for k in ("pothole", "hole", "sink")):
-            category = "Pothole"; assigned_department = "Public Works"; urgency = "Medium"
-        elif any(k in t for k in ("streetlight", "lamp", "light")):
-            category = "Streetlight"; assigned_department = "Electrical"; urgency = "Medium"
-        elif any(k in t for k in ("water", "leak", "sewer", "flood")):
-            category = "Water Leakage"; assigned_department = "Water Board"; urgency = "High"
-        elif any(k in t for k in ("garbage", "trash", "bin", "sanitation")):
-            category = "Sanitation"; assigned_department = "Sanitation"; urgency = "Low"
-        title = (text_in or "").strip()[:100] or "Citizen report"
-        return {"title": title, "category": category, "urgency": urgency, "assigned_department": assigned_department}
+    # combine sources: if both present, both are passed to the LLM for reconciliation
+    llm_input_text = user_text or image_caption or (f"Image at URL: {saved_image_url}" if saved_image_url else "")
+    try:
+        ai_out = await _reconcile_to_json(user_text, image_caption)
+    except Exception:
+        ai_out = _conservative_stub(" ".join(filter(None, [user_text, image_caption])))
 
-    ai_out = ai_stub(text)
-
-    # sanitize & enforce allowed values
+    # enforce allowed values
     category = ai_out.get("category") if ai_out.get("category") in ALLOWED_CATEGORIES else "Other"
     urgency = ai_out.get("urgency") if ai_out.get("urgency") in ALLOWED_URGENCIES else "Low"
-    assigned_department = (
-        ai_out.get("assigned_department") if ai_out.get("assigned_department") in ALLOWED_DEPARTMENTS else "General"
-    )
+    assigned_department = ai_out.get("assigned_department") if ai_out.get("assigned_department") in ALLOWED_DEPARTMENTS else "General"
     title = (ai_out.get("title") or "Citizen report")[:100]
-    original_text = (text or "")[:500]
+    original_text_field = (ai_out.get("description") or user_text or image_caption or "")[:500] or None
 
-    # build report dict for DB insertion consistent with crud.ReportInDB
-    report_payload: Dict[str, Any] = {
-        "user_id": user_id,
+    payload: Dict[str, Any] = {
+        "user_id": str(user_id),
         "title": title,
-        "description": original_text or title,
-        "department": assigned_department,
-        "status": "submitted",  # crud.ReportInDB default is 'submitted'
-        "location": {"type": "Point", "coordinates": [longitude, latitude]},
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
-        # AI fields & media
         "category": category,
         "urgency": urgency,
         "assigned_department": assigned_department,
-        "original_text": original_text,
-        "image_url": saved_image_url,
-        "upvotes": 0,
-        "upvoted_by": [],
+        "original_text": original_text_field,
+        "image_url": saved_image_url or None,
+        "location": {"type": "Point", "coordinates": [longitude, latitude]},
+        "status": "Submitted",
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
     }
 
-    # create using crud wrapper; we do not return the created object
     try:
-        # validate and create ReportInDB -> create_report expects ReportInDB
-        report_obj = crud.ReportInDB.model_validate(report_payload)
-        crud.create_report(report_obj)
-    except Exception as e:
-        # keep error minimal
+        # adapt to your crud layer; if it accepts dicts use that, otherwise validate as before
+        try:
+            report_obj = crud.ReportInDB.model_validate(payload)
+            crud.create_report(report_obj)
+        except Exception:
+            crud.create_report(payload)
+    except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to persist report")
 
     return {"status": "success"}
