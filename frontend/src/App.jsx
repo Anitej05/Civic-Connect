@@ -7,6 +7,7 @@ import ReportForm from "./pages/ReportForm";
 import MyReports from "./pages/MyReports";
 import Profile from "./pages/Profile";
 import { SignedIn, SignedOut, RedirectToSignIn, useUser } from "@clerk/clerk-react";
+import Header from "./components/Header";
 
 function RoleBasedRoute({ children, adminOnly = false }) {
   const { user } = useUser();
@@ -20,7 +21,10 @@ function RoleBasedRoute({ children, adminOnly = false }) {
 
 export default function App() {
   return (
-    <Routes>
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <main className="pt-6">
+        <Routes>
       <Route path="/login" element={<Login />} />
 
       {/* Admin routes */}
@@ -87,8 +91,10 @@ export default function App() {
         }
       />
 
-      {/* Default */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+          {/* Default */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </main>
+    </div>
   );
 }

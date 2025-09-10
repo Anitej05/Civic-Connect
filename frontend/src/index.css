@@ -1,10 +1,173 @@
 ﻿
-@import "tailwindcss";
+@import "./styles/base.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 #map {
-  height: calc(100vh - 4rem);
+  height: calc(100vh - var(--header-height));
+}
+
+:root {
+  --header-height: 4rem;
 }
 
 .leaflet-container {
   background: #f7fafc;
+}
+
+/* Auth Form Styles */
+.cl-card {
+  width: 100% !important;
+  max-width: 560px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 1.25rem !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.cl-internal-b3fm6y {
+  height: 48px !important;
+  padding: 0.75rem 1rem !important;
+  border-radius: 0.5rem !important;
+  font-size: 1rem !important;
+  border: 2px solid #e5e7eb !important;
+}
+
+.cl-internal-uyu30o {
+  height: 48px !important;
+  padding: 0 1.5rem !important;
+  border-radius: 0.5rem !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  transition: all 0.2s !important;
+}
+
+.cl-internal-uyu30o:hover {
+  transform: translateY(-1px) !important;
+}
+
+.cl-internal-b3fm6y:focus {
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1) !important;
+}
+
+/* Make OAuth buttons larger */
+.cl-socialButtonsBlockButton {
+  height: 48px !important;
+  font-size: 1rem !important;
+  border-radius: 0.5rem !important;
+}
+
+/* Remove Clerk inner gradient footer and make inner header match outer card */
+.cl-footer, .cl-cardFooter {
+  display: none !important;
+}
+.cl-cardBody, .cl-cardHeader {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.cl-cardWrapper {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Improve spacing between elements */
+.cl-formFieldRow {
+  margin-bottom: 1.25rem !important;
+}
+
+.cl-dividerText {
+  font-size: 1rem !important;
+  color: #6b7280 !important;
+  margin: 1.5rem 0 !important;
+}
+
+.cl-headerTitle {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: #111827 !important;
+}
+
+.cl-headerSubtitle {
+  font-size: 0.95rem !important;
+  color: #6b7280 !important;
+  margin-top: 0.25rem !important;
+}
+
+/* Header alignment refinement */
+.site-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+
+/* Center login card below header */
+.login-wrap {
+  min-height: calc(100vh - var(--header-height));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+}
+
+/* subtle backdrop behind login content */
+.login-backdrop {
+  width: 100%;
+  max-width: 720px;
+  padding: 0;
+  margin: 0 auto;
+  border-radius: 1rem;
+  background: none;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Report Card Styles */
+.report-card {
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: var(--spacing-md);
+}
+
+/* Form Control Styles */
+.form-control {
+  margin-bottom: var(--spacing-md);
+}
+
+.form-control label {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* Button Variants */
+.btn-primary {
+  background-color: #0284c7;
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #0369a1;
+}
+
+.btn-secondary {
+  background-color: white;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+}
+
+.btn-secondary:hover {
+  background-color: #f9fafb;
 }

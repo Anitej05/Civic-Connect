@@ -1,7 +1,9 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from fastapi import APIRouter, Request, Header, HTTPException
 from svix.webhooks import Webhook, WebhookVerificationError
-from ..database.crud import create_user
+from crud import create_user
 
 CLERK_WEBHOOK_SECRET = os.environ.get("CLERK_WEBHOOK_SECRET")
 
@@ -34,7 +36,7 @@ async def handle_clerk_webhook(
     if event_type == "user.created":
         clerk_user_id = payload["data"]["id"]
         email = payload["data"]["email_addresses"][0]["email_address"]
-        new_user = await create_user(clerk_user_id=clerk_user_id, email=email)
+        new_user = create_user(clerk_user_id=clerk_user_id, email=email)
         if new_user:
             print(f"Successfully synced new user to database.")
         else:

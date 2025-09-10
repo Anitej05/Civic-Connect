@@ -1,8 +1,10 @@
 from fastapi import FastAPI
+from dotenv import load_dotenv
+load_dotenv()
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from .webhooks import router as webhooks_router
-from .reports import router as reports_router
+from webhooks import router as webhooks_router
+from reports import router as reports_router
 
 app = FastAPI(title="Civic Connect API")
 app.add_middleware(

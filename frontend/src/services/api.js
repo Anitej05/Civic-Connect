@@ -1,83 +1,76 @@
 ﻿
-// Mock API — replace with real axios calls when backend is ready
-// Integrate Clerk's getToken() to attach Authorization header
 
-export async function fetchAdminReports({ department = null } = {}) {
-  const base = [
-    {
-      _id: "r1",
-      title: "Pothole on Main St",
-      category: "Pothole",
-      urgency: "High",
-      assigned_department: "Public Works",
-      original_text: "Deep pothole near bus stop",
-      location: { type: "Point", coordinates: [78.4013, 17.4458] },
-      status: "Submitted",
-      created_at: new Date().toISOString(),
-    },
-    {
-      _id: "r2",
-      title: "Streetlight flickering",
-      category: "Streetlight",
-      urgency: "Medium",
-      assigned_department: "Electrical",
-      original_text: "Light flickers at night",
-      location: { type: "Point", coordinates: [78.4050, 17.4470] },
-      status: "In Progress",
-      created_at: new Date().toISOString(),
-    },
-  ];
-  return base.filter((r) => (department ? r.assigned_department === department : true));
+import axios from "axios";
+
+const API_BASE = "/api";
+
+function getAuthHeaders(token) {
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function fetchReportById(id) {
-  const all = await fetchAdminReports({});
-  return all.find((r) => r._id === id) || null;
+export async function fetchAdminReports({ department = null, category = null, status = null, page = 1, page_size = 50 } = {}, token = null) {
+  const params = {};
+  if (department) params.department = department;
+  if (category) params.category = category;
+  if (status) params.status_filter = status;
+  params.page = page;
+  params.page_size = page_size;
+  const headers = getAuthHeaders(token);
+  const res = await axios.get(`${API_BASE}/admin/reports`, { params, headers });
+  return res.data.data;
 }
 
-export async function updateReportStatus(id, newStatus) {
-  return { message: "Status updated", report: { _id: id, status: newStatus } };
+export async function fetchReportById(id, token = null) {
+  // If you have a dedicated endpoint, use it:
+  // const headers = getAuthHeaders(token);
+  // const res = await axios.get(`${API_BASE}/report/${id}`, { headers });
+  // return res.data;
+  // Otherwise, filter from all:
+  const reports = await fetchAdminReports({}, token);
+  return reports.find((r) => r.id === id || r._id === id) || null;
 }
 
+export async function updateReportStatus(id, newStatus, notes = "", progress_image_url = "", resolved_image_url = "", token = null) {
+  const payload = { status: newStatus, notes, progress_image_url, resolved_image_url };
+  const headers = getAuthHeaders(token);
+  const res = await axios.put(`${API_BASE}/admin/report/${id}/status`, payload, { headers });
+  return res.data;
+}
 
 // -------------------- USER APIs --------------------
-export async function fetchFeedReports() {
-  return [
-    {
-      id: "1",
-      title: "Broken Streetlight",
-      category: "Electrical",
-      status: "In Progress",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "2",
-      title: "Overflowing Garbage Bin",
-      category: "Sanitation",
-      status: "Submitted",
-      created_at: new Date().toISOString(),
-    },
-  ];
+export async function fetchFeedReports(lat = null, lng = null, token = null) {
+  const headers = getAuthHeaders(token);
+  if (lat && lng) {
+    const res = await axios.get(`${API_BASE}/nearby`, { params: { lat, lng }, headers });
+    return res.data.data;
+  }
+  return await fetchAdminReports({}, token);
 }
 
-export async function fetchUserReports(userId) {
-  return [
-    {
-      id: "10",
-      title: "Water leakage near home",
-      category: "Water",
-      status: "Submitted",
-      created_at: new Date().toISOString(),
-      userId,
-    },
-  ];
+export async function fetchUserReports(token = null) {
+  const headers = getAuthHeaders(token);
+  const res = await axios.get(`${API_BASE}/my-reports`, { headers });
+  return res.data.data;
 }
 
-export async function submitUserReport(data) {
-  return {
-    id: Date.now().toString(),
-    ...data,
-    status: "Submitted",
-    created_at: new Date().toISOString(),
-  };
+export async function submitUserReport(data, token = null) {
+  const headers = getAuthHeaders(token);
+  const formData = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) formData.append(key, value);
+  });
+  const res = await axios.post(`${API_BASE}/smart-create`, formData, { headers });
+  return res.data;
+}
+
+export async function upvoteReport(id, token = null) {
+  const headers = getAuthHeaders(token);
+  const res = await axios.post(`${API_BASE}/report/${id}/upvote`, {}, { headers });
+  return res.data;
+}
+
+export async function fetchNotifications(token = null) {
+  const headers = getAuthHeaders(token);
+  const res = await axios.get(`${API_BASE}/notifications`, { headers });
+  return res.data.notifications;
 }

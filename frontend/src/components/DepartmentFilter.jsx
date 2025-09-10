@@ -12,14 +12,14 @@ const departments = [
 
 export default function DepartmentFilter({ value, onChange }) {
   return (
-    <div className="flex items-center gap-2">
-      <label className="text-sm font-medium">Department</label>
+    <div className="form-control flex items-center gap-3">
+      <label className="!mb-0">Department</label>
       <select
         value={value || "All"}
         onChange={(e) =>
           onChange(e.target.value === "All" ? null : e.target.value)
         }
-        className="px-3 py-2 border rounded-md bg-white"
+        className="!w-auto"
       >
         {departments.map((d) => (
           <option key={d} value={d}>

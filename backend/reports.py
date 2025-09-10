@@ -11,6 +11,8 @@ from fastapi import (
     Depends,
 )
 import os,json,re
+from dotenv import load_dotenv
+load_dotenv()
 import uuid
 import shutil
 from datetime import datetime
@@ -18,7 +20,7 @@ from typing import Optional, Any, Dict
 from pydantic import Field
 from bson.objectid import ObjectId
 from fastapi_clerk_auth import ClerkConfig, ClerkHTTPBearer, HTTPAuthorizationCredentials
-from ..database import crud
+import crud
 import httpx
 
 ## Constants
@@ -60,7 +62,8 @@ def _ensure_admin(request: Request) -> None:
 
 
 def _save_upload(file: UploadFile) -> str:
-    ext = os.path.splitext(file.filename)[1] or ""
+    filename = file.filename or ""
+    ext = os.path.splitext(filename)[1] or ""
     fname = f"{int(datetime.utcnow().timestamp())}-{uuid.uuid4().hex}{ext}"
     dst_path = os.path.join(STATIC_UPLOAD_DIR, fname)
     with open(dst_path, "wb") as out_f:
@@ -245,8 +248,9 @@ async def smart_create_report(
         try:
             report_obj = crud.ReportInDB.model_validate(payload)
             crud.create_report(report_obj)
-        except Exception:
-            crud.create_report(payload)
+        except Exception as e:
+            # If validation fails, raise an error instead of passing a dict
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to validate report data: {str(e)}")
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to persist report")
 

@@ -28,39 +28,54 @@ export default function ReportForm() {
   };
 
   return (
-    <div className="max-w-lg mx-auto p-6 bg-white rounded shadow mt-10">
-      <h2 className="text-2xl font-bold mb-4">Submit a Report</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Title"
-          className="w-full border p-2 rounded"
-          required
-        />
-        <textarea
-          value={details}
-          onChange={(e) => setDetails(e.target.value)}
-          placeholder="Describe the issue"
-          className="w-full border p-2 rounded"
-          rows="4"
-          required
-        />
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full border p-2 rounded"
-        >
-          <option>General</option>
-          <option>Pothole</option>
-          <option>Streetlight</option>
-          <option>Sanitation</option>
-          <option>Water Supply</option>
-        </select>
-        <button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded">
-          Submit
-        </button>
-      </form>
+    <div className="page-container bg-gray-50">
+      <div className="container-sm">
+        <div className="card">
+          <h2 className="text-2xl font-bold mb-6">Submit a Report</h2>
+          <form onSubmit={handleSubmit}>
+            <div className="form-control">
+              <label htmlFor="title">Title</label>
+              <input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter a descriptive title"
+                required
+              />
+            </div>
+            <div className="form-control">
+              <label htmlFor="details">Description</label>
+              <textarea
+                id="details"
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
+                placeholder="Describe the issue in detail"
+                rows="4"
+                required
+              />
+            </div>
+            <div className="form-control">
+              <label htmlFor="category">Category</label>
+              <select
+                id="category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option>General</option>
+                <option>Pothole</option>
+                <option>Streetlight</option>
+                <option>Sanitation</option>
+                <option>Water Supply</option>
+              </select>
+            </div>
+            <div className="mt-6">
+              <button type="submit" className="btn-primary w-full">
+                Submit Report
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
