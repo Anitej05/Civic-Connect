@@ -1,39 +1,59 @@
-﻿
-import React from "react";
+﻿import React from "react";
 import { SignIn } from "@clerk/clerk-react";
 
 export default function Login() {
   return (
-    <div className="login-wrap bg-gradient-to-b from-sky-50 to-gray-100 w-full flex flex-col items-center justify-center">
-      <div className="flex flex-col items-center justify-center" style={{marginBottom: '2.5rem'}}>
-        <div className="flex flex-col items-center justify-center gap-2">
-          <div style={{width:48,height:48,borderRadius:12,background:'var(--color-primary)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#fff"/><text x="16" y="21" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#0ea5e9">CC</text></svg>
-          </div>
-          <span className="text-2xl font-bold text-gray-900">Civic Connect</span>
+    <div className="login-container">
+      <div className="login-header">
+        <div className="logo-container">
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 48 48"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="logo-svg"
+          >
+            <circle cx="24" cy="24" r="24" fill="#0ea5e9" />
+            <text
+              x="50%"
+              y="50%"
+              textAnchor="middle"
+              dy=".3em"
+              fontSize="20"
+              fontWeight="bold"
+              fill="white"
+            >
+              CC
+            </text>
+          </svg>
         </div>
-        <div className="text-base text-gray-500 font-medium mt-2">AI-powered Civic Issue Resolution</div>
+        <h1 className="text-2xl font-bold text-gray-900">Civic Connect</h1>
+        <p className="text-base text-gray-500 font-medium mt-1">
+          AI-powered Civic Issue Resolution
+        </p>
       </div>
-      <div className="w-full flex justify-center">
-        <div style={{width: '100%', maxWidth: 560, borderRadius: '1.25rem', boxShadow: '0 18px 50px rgba(2,6,23,0.12)', background: '#fff', padding: '2.5rem 2rem'}}>
-          <h1 className="text-3xl font-bold text-center" style={{marginBottom: '2rem', marginTop: 0, padding: 0}}>Admin Sign In</h1>
-          <SignIn 
-            routing="path" 
-            path="/login"
-            appearance={{
-              elements: {
-                card: 'shadow-none p-0 m-0 bg-transparent',
-                headerTitle: 'text-xl font-bold text-gray-900 m-0 p-0',
-                headerSubtitle: 'text-base text-gray-500 mb-4 m-0 p-0',
-                socialButtonsBlockButton: 'border-2 hover:border-gray-300 h-12 text-base rounded-lg m-0',
-                formField: 'mb-4 m-0',
-                formFieldInput: 'h-12 text-base rounded-lg m-0',
-                footer: 'hidden',
-              },
-            }} 
-          />
-        </div>
-      </div>
+
+      {/* No more custom card wrapper. Styling is now fully inside SignIn */}
+      <SignIn
+        routing="path"
+        path="/login"
+        appearance={{
+          elements: {
+            // Style Clerk's card to be our card
+            card: "bg-white p-10 rounded-2xl shadow-xl w-full max-w-md",
+            headerTitle: "text-2xl font-bold text-center mb-6",
+            headerSubtitle: "hidden", // Hide default subtitle if not needed
+            footer: "hidden",
+            formFieldInput:
+              "h-12 text-base rounded-lg focus:ring-sky-500 focus:border-sky-500",
+            formButtonPrimary: "h-12 text-base rounded-lg",
+            socialButtonsBlockButton:
+              "h-12 text-base rounded-lg border-gray-300 hover:bg-gray-50",
+          },
+        }}
+      >
+      </SignIn>
     </div>
   );
 }
