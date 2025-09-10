@@ -1,0 +1,10 @@
+﻿
+@import "tailwindcss";
+
+#map {
+  height: calc(100vh - 4rem);
+}
+
+.leaflet-container {
+  background: #f7fafc;
+}
