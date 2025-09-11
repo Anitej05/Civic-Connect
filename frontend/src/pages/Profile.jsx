@@ -2,9 +2,11 @@ import { UserProfile } from "@clerk/clerk-react";
 
 export default function Profile() {
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h2 className="text-2xl font-bold mb-4">My Profile</h2>
-      <UserProfile path="/user/profile" routing="path" />
+    <div className="page-container bg-gray-50 flex items-center justify-center py-12">
+      {/* Fix: Added a wrapper div to apply a scale transform */}
+      <div className="profile-container">
+        <UserProfile />
+      </div>
     </div>
   );
 }

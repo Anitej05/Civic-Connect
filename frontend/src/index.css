@@ -78,6 +78,9 @@
   background-color: #0284c7;
   color: white;
   border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px; /* pill shape */
+  font-weight: 500;
 }
 
 .btn-primary:hover {
@@ -88,8 +91,42 @@
   background-color: white;
   color: #1f2937;
   border: 1px solid #e5e7eb;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px; /* pill shape */
+  font-weight: 500;
 }
 
 .btn-secondary:hover {
   background-color: #f9fafb;
+}
+
+.profile-container {
+  transform: scale(0.9);
+  transform-origin: center;
+}
+
+/* Fix: Added styles for full-viewport layout */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Hide the main scrollbar */
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.site-header {
+  height: 15vh;
+  flex-shrink: 0; /* Prevent the header from shrinking */
+}
+
+.main-content {
+  height: 85vh;
+  overflow-y: auto; /* Allow this container to scroll if content overflows */
 }

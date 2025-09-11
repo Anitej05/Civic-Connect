@@ -11,9 +11,11 @@ export default function UserDashboard() {
             <Link to="/user/report" className="btn-primary">
               Submit Report
             </Link>
-            <Link to="/user/my-reports" className="btn-primary" style={{ backgroundColor: '#16a34a' }}>
+            {/* Fix: Use className for consistent styling */}
+            <Link to="/user/my-reports" className="btn-primary">
               My Reports
             </Link>
+            {/* Fix: Use className for consistent styling */}
             <Link to="/user/profile" className="btn-secondary">
               Profile
             </Link>

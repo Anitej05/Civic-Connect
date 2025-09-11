@@ -5,3 +5,4 @@ python-dotenv
 httpx
 svix
 fastapi-clerk-auth
+python-jose[cryptography]
