@@ -1,119 +1,68 @@
-﻿import React, { useEffect } from "react";
+import React, { useEffect } from "react";
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import DepartmentFilter from "../components/DepartmentFilter";
 import ReportMarker from "../components/ReportMarker";
 import { useSelector, useDispatch } from "react-redux";
-import { loadReports, setDepartmentFilter } from "../features/reportsSlice";
-import { useUser, useClerk } from "@clerk/clerk-react";
-import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
-import { useUserRole } from "../hooks/useUserRole"; // Import the hook for role checking
+import {
+  fetchAdminReports,
+  setDepartmentFilter,
+  selectAdminReports,
+} from "../features/reportsSlice";
 
 export default function Dashboard() {
   const dispatch = useDispatch();
-  const { list: reports, loading, error, departmentFilter } = useSelector(
-    (state) => state.reports
-  );
-  const { user } = useUser();
-  const { signOut } = useClerk();
-  const nav = useNavigate();
-  const { isAdmin, isLoading: isRoleLoading } = useUserRole(); // Use the hook
+  const {
+    reports,
+    loading,
+    error,
+    departmentFilter,
+  } = useSelector(selectAdminReports);
 
   useEffect(() => {
-    dispatch(loadReports(departmentFilter));
+    // Fetch reports whenever the component mounts or the filter changes
+    dispatch(fetchAdminReports(departmentFilter));
   }, [dispatch, departmentFilter]);
 
-  function handleLogout() {
-    signOut();
-    toast("Logged out");
-    nav("/login");
-  }
+  const handleFilterChange = (value) => {
+    dispatch(setDepartmentFilter(value));
+  };
 
-  // Display a loading message while we verify the user's role
-  if (isRoleLoading) {
-    return <div className="p-6 text-center">Verifying credentials...</div>;
-  }
-
-  // --- Regular User View ---
-  // A simple list of reports without the map.
-  const userView = (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Submitted Reports</h2>
-      {loading && <div>Loading reports...</div>}
-      {error && <div className="text-red-600">Error: {error}</div>}
-      <div className="space-y-4">
-        {reports.map((report) => (
-          <div key={report._id} className="p-4 bg-white rounded-lg shadow">
-            <h3 className="font-bold">{report.title}</h3>
-            <p className="text-gray-600">{report.description}</p>
-            <div className="mt-2 text-sm">
-              <span className="font-semibold">Status:</span> {report.status}
-            </div>
-          </div>
-        ))}
+  return (
+    // The parent container is now the main layout from App.jsx,
+    // so we just need to render the map itself.
+    <main className="flex-1 relative">
+      {/* Overlay for filters and loading/error states */}
+      <div className="absolute top-4 left-4 z-[1000] bg-white p-4 rounded-lg shadow-lg flex items-center gap-4">
+        <DepartmentFilter
+          value={departmentFilter}
+          onChange={handleFilterChange}
+        />
+        <button
+          onClick={() => dispatch(fetchAdminReports(departmentFilter))}
+          className="btn-secondary"
+          disabled={loading}
+        >
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
+        {error && <div className="text-red-600 text-sm">Error: {error}</div>}
       </div>
-    </div>
-  );
 
-  // --- Admin View ---
-  // The original dashboard with the map.
-  const adminView = (
-    <main className="flex-1">
-      {loading && <div className="p-6">Loading reports...</div>}
-      {error && <div className="p-6 text-red-600">Error: {error}</div>}
       <MapContainer
         id="map"
-        center={[17.4458, 78.4013]}
-        zoom={14}
+        center={[17.4458, 78.4013]} // Default center, can be dynamic
+        zoom={12}
         scrollWheelZoom
-        style={{ height: "calc(100vh - 72px)" }}
+        style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        {reports.map((r) => (
-          // Pass the 'isAdmin' prop to each marker
-          <ReportMarker key={r._id} report={r} isAdmin={isAdmin} />
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
+        {reports.map((report) => (
+          <ReportMarker key={report.id} report={report} />
         ))}
       </MapContainer>
     </main>
-  );
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between p-4 bg-white shadow">
-        <div className="flex items-center gap-4">
-          {/* Dynamically change the title based on the user's role */}
-          <h1 className="text-xl font-semibold">
-            Civic Connect — {isAdmin ? "Admin" : "Dashboard"}
-          </h1>
-          {/* Only show the department filter and refresh button to admins */}
-          {isAdmin && (
-            <>
-              <DepartmentFilter
-                value={departmentFilter}
-                onChange={(val) => dispatch(setDepartmentFilter(val))}
-              />
-              <button
-                onClick={() => dispatch(loadReports(departmentFilter))}
-                className="px-3 py-1 rounded border text-sm"
-              >
-                Refresh
-              </button>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-gray-600">
-            Signed in as {user?.primaryEmailAddress?.emailAddress}
-          </div>
-          <button onClick={handleLogout} className="px-3 py-1 rounded border">
-            Logout
-          </button>
-        </div>
-      </header>
-
-      {/* Render the correct view based on the user's role */}
-      {isAdmin ? adminView : userView}
-    </div>
   );
 }

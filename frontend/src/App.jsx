@@ -1,164 +1,89 @@
-﻿import React from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { SignedIn, SignedOut, useUser } from "@clerk/clerk-react";
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchUser, selectAuth } from './features/authSlice';
 
-// Import all pages
-import AuthPage from "./pages/AuthPage";
-import SignUpPage from "./pages/SignUpPage";
-import Dashboard from "./pages/Dashboard";
-import ReportDetails from "./pages/ReportDetails";
-import UserDashboard from "./pages/UserDashboard";
-import ReportForm from "./pages/ReportForm";
-import MyReports from "./pages/MyReports";
-import Profile from "./pages/Profile";
-import Landing from "./pages/Landing";
-import Header from "./components/Header";
+// Layout and Component Imports
+import Header from './components/Header';
+import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 
-// This is your original RoleBasedRoute component. It remains unchanged.
-function RoleBasedRoute({ children, adminOnly = false }) {
-  const { user, isLoaded } = useUser();
+// Page Imports
+import Login from './pages/Login';
+import SignUpPage from './pages/SignUpPage';
+import Landing from './pages/Landing';
+import UserDashboard from './pages/UserDashboard';
+import ReportForm from './pages/ReportForm';
+import MyReports from './pages/MyReports';
+import Dashboard from './pages/Dashboard'; // Admin Dashboard
+import ReportDetails from './pages/ReportDetails'; // Can be used by both
 
-  // Wait until the user object is loaded before checking the role
-  if (!isLoaded) {
-    return <div className="p-6 text-center">Loading...</div>; // Or a spinner component
+// A layout component to wrap pages that need the site header
+const MainLayout = ({ children }) => (
+  <div className="app-container">
+    <header className="site-header">
+      <Header />
+    </header>
+    <main className="main-content">
+      {children}
+    </main>
+  </div>
+);
+
+function App() {
+  const dispatch = useDispatch();
+  const { token, isAuthenticated, user, loading } = useSelector(selectAuth);
+
+  useEffect(() => {
+    // On app load, if a token exists in localStorage but the user isn't authenticated in state,
+    // try to fetch the user's data to restore the session.
+    if (token && !isAuthenticated) {
+      dispatch(fetchUser());
+    }
+  }, [token, isAuthenticated, dispatch]);
+
+  // While checking for the token on initial load, show a loading screen.
+  if (loading && !isAuthenticated) {
+      return <div className="flex justify-center items-center h-screen"><div>Loading Application...</div></div>;
   }
-
-  const role = user?.publicMetadata?.role || "citizen";
-
-  if (adminOnly && role !== "admin") return <Navigate to="/user" replace />;
-  if (!adminOnly && role === "admin") return <Navigate to="/admin" replace />;
-
-  return children;
-}
-
-// This is your original HomeRedirect component. It remains unchanged.
-function HomeRedirect() {
-  const { user, isLoaded } = useUser();
-
-  if (!isLoaded) {
-    return <div className="p-6 text-center">Loading...</div>;
-  }
-
-  const role = user?.publicMetadata?.role || "citizen";
-
-  return <Navigate to={role === "admin" ? "/admin" : "/user"} replace />;
-}
-
-// This is your AppLayout component, with logic updated for the new pages.
-function AppLayout() {
-  const location = useLocation();
-  const { isSignedIn } = useUser();
-
-  // The header should be hidden on the landing page, login page, AND the new sign-up page.
-  const isPublicPage =
-    (location.pathname === "/" && !isSignedIn) ||
-    location.pathname === "/login" ||
-    location.pathname === "/sign-up"; // Added the new sign-up route here
 
   return (
-    // Fix: Replaced the main div with the new app container for the fixed layout
-    <div className="app-container">
-      {!isPublicPage && (
-        // Fix: Wrapped Header component in a header tag with the correct class
-        <header className="site-header">
-          <Header />
-        </header>
-      )}
-      {/* Fix: The main content area now has its class for scrolling and height adjustment */}
-      <main className={`main-content ${isPublicPage ? "no-header" : ""}`}>
-        <Routes>
-          {/* === Public Routes === */}
-          {/* The /login route now points to AuthPage, which has the default Clerk UI */}
-          <Route path="/login" element={<AuthPage />} />
-          {/* A new /sign-up route is added for the registration flow */}
-          <Route path="/sign-up" element={<SignUpPage />} />
+    <Routes>
+      {/* Public routes that do not require authentication */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/landing" element={<Landing />} />
 
-          {/* Root route: directs to landing page or role-based dashboard */}
-          <Route
-            path="/"
-            element={
-              <>
-                <SignedIn>
-                  <HomeRedirect />
-                </SignedIn>
-                <SignedOut>
-                  <Landing />
-                </SignedOut>
-              </>
-            }
-          />
+      {/* Routes protected for any authenticated user */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/user" element={<MainLayout><UserDashboard /></MainLayout>} />
+        <Route path="/report" element={<MainLayout><ReportForm /></MainLayout>} />
+        <Route path="/my-reports" element={<MainLayout><MyReports /></MainLayout>} />
+        {/* This report detail page is accessible to citizens for their own reports */}
+        <Route path="/reports/:id" element={<MainLayout><ReportDetails /></MainLayout>} />
+      </Route>
 
-          {/* === Admin Routes (Unchanged from your original code) === */}
-          <Route
-            path="/admin"
-            element={
-              <SignedIn>
-                <RoleBasedRoute adminOnly>
-                  <Dashboard />
-                </RoleBasedRoute>
-              </SignedIn>
-            }
-          />
-          <Route
-            path="/admin/reports/:id"
-            element={
-              <SignedIn>
-                <RoleBasedRoute adminOnly>
-                  <ReportDetails />
-                </RoleBasedRoute>
-              </SignedIn>
-            }
-          />
+      {/* Routes protected for admin users only */}
+      <Route element={<AdminRoute />}>
+        <Route path="/admin" element={<MainLayout><Dashboard /></MainLayout>} />
+        {/* Admins use the same detail page component but have different permissions */}
+        <Route path="/admin/reports/:id" element={<MainLayout><ReportDetails /></MainLayout>} />
+      </Route>
 
-          {/* === User Routes (Unchanged from your original code) === */}
-          <Route
-            path="/user"
-            element={
-              <SignedIn>
-                <RoleBasedRoute>
-                  <UserDashboard />
-                </RoleBasedRoute>
-              </SignedIn>
-            }
-          />
-          <Route
-            path="/user/report"
-            element={
-              <SignedIn>
-                <RoleBasedRoute>
-                  <ReportForm />
-                </RoleBasedRoute>
-              </SignedIn>
-            }
-          />
-          <Route
-            path="/user/my-reports"
-            element={
-              <SignedIn>
-                <RoleBasedRoute>
-                  <MyReports />
-                </RoleBasedRoute>
-              </SignedIn>
-            }
-          />
-          <Route
-            path="/user/profile"
-            element={
-              <SignedIn>
-                <RoleBasedRoute>
-                  <Profile />
-                </RoleBasedRoute>
-              </SignedIn>
-            }
-          />
+      {/* Redirect logic for the root path */}
+      <Route
+        path="/"
+        element={
+          isAuthenticated
+            ? (user?.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/user" />)
+            : <Navigate to="/landing" />
+        }
+      />
 
-          {/* === Default Fallback Route (Unchanged from your original code) === */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-    </div>
+      {/* A fallback route to redirect any unknown paths to the appropriate home page */}
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
   );
 }
 
-// Your original default export remains unchanged.
-export default AppLayout;
+export default App;
